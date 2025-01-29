@@ -6,6 +6,10 @@ from pydantic_ai import Agent
 from process import text_to_midi
 from pydantic_ai.settings import ModelSettings
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY environment variable is not set")

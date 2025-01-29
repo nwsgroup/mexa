@@ -2,6 +2,10 @@ from fastapi import UploadFile
 import os
 import google.generativeai as genai
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 class AudioService:
     def __init__(self):
         self.upload_dir = "uploads"
