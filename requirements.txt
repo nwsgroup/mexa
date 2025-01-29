@@ -1,3 +1,6 @@
 google-generativeai
 pydantic-ai
 fastapi
+MIDIUtil
+fluidsynth 
+pydub
