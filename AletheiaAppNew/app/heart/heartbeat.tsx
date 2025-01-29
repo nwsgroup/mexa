@@ -7,8 +7,10 @@ import {
   SafeAreaView,
   Modal,
   Platform,
+  Pressable,
   StatusBar,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 import Animated, {
@@ -21,6 +23,7 @@ import Animated, {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import { Buffer } from 'buffer';
 
 // Types
 type AudioStatus = {
@@ -41,6 +44,7 @@ export default function HeartbeatScreen() {
   const [percentage, setPercentage] = useState(0);
 
   // Modal and audio states
+  const [overlayVisible, setOverlayVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -49,8 +53,38 @@ export default function HeartbeatScreen() {
 
   // Cleanup effect for sound
   useEffect(() => {
+    let isMounted = true;
+
+    const initAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+          staysActiveInBackground: true,
+        });
+        console.log('Audio mode set successfully');
+      } catch (error) {
+        console.error('Error setting audio mode:', error);
+      }
+    };
+
+    initAudio();
+
+    return () => {
+      isMounted = false;
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, []);
+
+  // Cleanup cuando el componente se desmonta
+  useEffect(() => {
     return () => {
       if (sound) {
+        console.log('Cleaning up sound');
         sound.unloadAsync();
       }
     };
@@ -59,74 +93,98 @@ export default function HeartbeatScreen() {
   // Audio playback functions
   const playHeartbeat = async (mp3Data: ArrayBuffer) => {
     try {
+      updateIsRunning(false);
       console.log('Starting playHeartbeat function');
 
       if (sound) {
         console.log('Unloading previous sound');
         await sound.unloadAsync();
+        setSound(null);
       }
+
+      // Convertir ArrayBuffer a Base64
+      const uint8Array = new Uint8Array(mp3Data);
+      const base64String = Buffer.from(uint8Array).toString('base64');
 
       // Crear archivo temporal
       const tempUri = `${FileSystem.documentDirectory}temp_${Date.now()}.mp3`;
       console.log('Temp file URI:', tempUri);
 
-      // Escribir el archivo directamente sin convertir a base64
-      await FileSystem.writeAsStringAsync(tempUri, mp3Data.toString(), {
-        encoding: FileSystem.EncodingType.UTF8,
+      // Escribir el archivo
+      await FileSystem.writeAsStringAsync(tempUri, base64String, {
+        encoding: FileSystem.EncodingType.Base64
       });
 
       console.log('File written successfully');
 
-      // Verificar si el archivo existe
+      // Verificar archivo
       const fileInfo = await FileSystem.getInfoAsync(tempUri);
-      console.log('File exists:', fileInfo.exists, 'File size:', fileInfo.size);
+      console.log('File exists:', fileInfo.exists);
 
-      // Cargar y reproducir el sonido
+      // Crear y configurar el objeto de sonido
       console.log('Creating sound object');
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: tempUri },
-        { shouldPlay: true }
-      );
+      const soundObject = new Audio.Sound();
 
-      console.log('Sound created successfully');
-
-      setSound(newSound);
-      setIsPlaying(true);
-
-      // Configurar el listener de estado
-      newSound.setOnPlaybackStatusUpdate((status) => {
+      // Configurar el listener antes de cargar
+      soundObject.setOnPlaybackStatusUpdate((status: any) => {
         console.log('Playback status:', status);
         if (status.didJustFinish) {
+          console.log('Playback finished');
           setIsPlaying(false);
         }
+        if (status.isPlaying) {
+          console.log('Audio is playing');
+        }
       });
+
+      await soundObject.loadAsync({ uri: tempUri });
+      console.log('Sound loaded successfully');
+
+      setSound(soundObject);
+
+      console.log('Starting playback');
+      const playbackStatus = await soundObject.playAsync();
+      console.log('Playback started:', playbackStatus);
+
+      setIsPlaying(true);
 
       // Limpiar archivo temporal
       setTimeout(async () => {
         try {
-          await FileSystem.deleteAsync(tempUri);
-          console.log('Temp file deleted');
+          const fileStillExists = await FileSystem.getInfoAsync(tempUri);
+          if (fileStillExists.exists) {
+            await FileSystem.deleteAsync(tempUri);
+            console.log('Temp file deleted');
+          }
         } catch (error) {
           console.error('Error deleting temp file:', error);
         }
-      }, 2000);
+      }, 5000); // Aumentado a 5 segundos
 
     } catch (error) {
-      console.error('Error in playHeartbeat:', error);
+      console.error('Detailed error in playHeartbeat:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      Alert.alert('Error', 'No se pudo reproducir el audio. Por favor, intenta de nuevo.');
       setIsPlaying(false);
     }
   };
 
+  // Función para detener el audio
   const stopSound = async () => {
-    if (sound) {
-      try {
+    try {
+      if (sound) {
+        console.log('Stopping sound');
         await sound.stopAsync();
         await sound.unloadAsync();
         setSound(null);
         setIsPlaying(false);
-      } catch (error) {
-        console.error('Error stopping sound:', error);
+        console.log('Sound stopped and unloaded');
       }
+    } catch (error) {
+      console.error('Error stopping sound:', error);
     }
   };
 
@@ -135,37 +193,35 @@ export default function HeartbeatScreen() {
     try {
       console.log('Initiating API request...');
 
+      // Generar BPM aleatorio entre 60 y 110
+      const randomBPM = Math.floor(Math.random() * (110 - 60 + 1)) + 60;
+      console.log('Generated BPM:', randomBPM);
+
       const response = await fetch('http://192.168.1.61:8000/api/v1/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'audio/mpeg'
         },
         body: JSON.stringify({
-          bpm: 20
+          bpm: randomBPM
         })
       });
-
-      console.log('API Response status:', response.status);
 
       if (!response.ok) {
         throw new Error(`Network response was not ok: ${response.status}`);
       }
 
       const mp3Data = await response.arrayBuffer();
-      console.log('Received ArrayBuffer size:', mp3Data.byteLength);
-
-      // Primero mostrar el modal
-      setModalVisible(true);
-      console.log('Modal set to visible');
-
-      // Esperar un momento para asegurar que el modal esté visible
-      setTimeout(async () => {
-        console.log('Starting audio playback');
-        await playHeartbeat(mp3Data);
-      }, 500);
+      setOverlayVisible(true);
+      await playHeartbeat(mp3Data);
 
     } catch (error) {
       console.error('Error in generateAndPlayHeartbeat:', error);
+      Alert.alert(
+        'Error',
+        'No se pudo generar el latido. Por favor, intenta de nuevo.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -207,25 +263,6 @@ export default function HeartbeatScreen() {
       }
     }, 1000);
   };
-
-
-  useEffect(() => {
-    const initAudio = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          shouldDuckAndroid: true,
-        });
-        console.log('Audio mode set successfully');
-      } catch (error) {
-        console.error('Error setting audio mode:', error);
-      }
-    };
-
-    initAudio();
-  }, []);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: CIRCLE_LENGTH * (1 - progress.value),
@@ -304,31 +341,20 @@ export default function HeartbeatScreen() {
       </View>
 
       {/* Audio Modal */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => {
-          stopSound();
-          setModalVisible(false);
-        }}
-        statusBarTranslucent
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => {
-                  stopSound();
-                  setModalVisible(false);
-                }}
-              >
-                <MaterialCommunityIcons name="close" size={24} color="#F4B942" />
-              </TouchableOpacity>
-            </View>
+      {overlayVisible && (
+        <View style={styles.overlay}>
+          <View style={styles.overlayContent}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                stopSound();
+                setOverlayVisible(false);
+              }}
+            >
+              <MaterialCommunityIcons name="close" size={24} color="#F4B942" />
+            </TouchableOpacity>
 
-            <Text style={styles.modalTitle}>Your Heartbeat</Text>
+            <Text style={styles.overlayTitle}>Your Heartbeat</Text>
 
             <View style={styles.heartbeatVisualizer}>
               {isLoading ? (
@@ -343,33 +369,14 @@ export default function HeartbeatScreen() {
               )}
             </View>
 
-            {!isLoading && (
-              <TouchableOpacity
-                style={styles.playButton}
-                onPress={() => {
-                  if (isPlaying) {
-                    stopSound();
-                  } else if (audioData) {
-                    playHeartbeat(audioData);
-                  }
-                }}
-              >
-                <MaterialCommunityIcons
-                  name={isPlaying ? "pause-circle" : "play-circle"}
-                  size={50}
-                  color="#F4B942"
-                />
-              </TouchableOpacity>
-            )}
-
-            <Text style={styles.modalText}>
+            <Text style={styles.overlayText}>
               {isLoading ? "Generating your heartbeat..." :
                 isPlaying ? "Playing your heartbeat..." :
-                  "Press play to listen"}
+                  "Listen to hear your heartbeat."}
             </Text>
           </View>
         </View>
-      </Modal>
+      )}
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
@@ -483,33 +490,51 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  modalContainer: {
-    flex: 1,
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
-  modalContent: {
+  overlayContent: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderRadius: 20,
     padding: 20,
-    maxHeight: '80%',
-    width: '100%',
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: -2,
+      height: 2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+  overlayTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#F4B942',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  overlayText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 15,
     marginBottom: 20,
   },
   closeButton: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
     padding: 10,
     zIndex: 1,
   },
@@ -531,6 +556,7 @@ const styles = StyleSheet.create({
   },
   pulsing: {
     opacity: 0.7,
+    transform: [{ scale: 1.1 }],
   },
   playButton: {
     alignSelf: 'center',
@@ -542,5 +568,6 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 15,
-  }
+    marginBottom: 20,
+  },
 });
