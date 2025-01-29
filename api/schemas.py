@@ -9,3 +9,9 @@ class BPMUpdate(BaseModel):
                 "bpm": 120.5
             }
         }
+
+
+from pydantic import BaseModel, Field
+
+class BPMRequest(BaseModel):
+    bpm: float = Field(..., ge=20, le=200, description="Beats per minute for the generated music")
