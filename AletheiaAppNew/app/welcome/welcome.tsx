@@ -42,14 +42,20 @@ export default function Welcome() {
                         />
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.navButton}>
+                    <TouchableOpacity 
+                        style={styles.navButton}
+                        onPress={() => router.push('/voice_note/voice_note')}
+                    >
                         <Image
                             source={require('../../assets/images/mic-icon.png')}
                             style={styles.navIcon}
                         />
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.navButton}>
+                    <TouchableOpacity 
+                        style={styles.navButton}
+                        onPress={() => router.push('/voice_note/list_notes')}
+                        >
                         <Image
                             source={require('../../assets/images/stats-icon.png')}
                             style={styles.navIcon}
