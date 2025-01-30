@@ -63,12 +63,10 @@ const styles = StyleSheet.create({
   backgroundImage: {
     flex: 1,
     width: '100%',
-    // Asegúrate de que la imagen de fondo ocupe toda la pantalla
     height: '100%',
   },
   content: {
     flex: 1,
-    // Ajusta el padding superior para dispositivos con notch
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   logoContainer: {

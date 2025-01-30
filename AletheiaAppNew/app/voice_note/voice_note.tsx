@@ -4,12 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 
 export default function AudioRecorderScreen() {
-  const [recording, setRecording] = useState();
+  const [recording, setRecording] = useState<Audio.Recording | undefined>();
   const [isRecording, setIsRecording] = useState(false);
   const [permissionResponse, requestPermission] = Audio.usePermissions();
 
   useEffect(() => {
-    // Solicitar permisos al montar el componente
     if (permissionResponse?.status !== 'granted') {
       requestPermission();
     }
@@ -17,7 +16,6 @@ export default function AudioRecorderScreen() {
 
   async function startRecording() {
     try {
-
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -35,7 +33,6 @@ export default function AudioRecorderScreen() {
 
   async function stopRecording() {
     try {
-
       if (!recording) {
         return;
       }
@@ -55,13 +52,15 @@ export default function AudioRecorderScreen() {
     }
   }
 
-  const saveAudioEntry = async (uri: string, transcription: string) => {
+  const saveAudioEntry = async (uri: string, transcription: string, classification:string, irrational_ideas:any = {}) => {
     try {
       const newEntry = {
         id: Date.now().toString(),
         date: new Date().toISOString(),
         transcription,
         uri,
+        classification,
+        irrational_ideas
       };
   
       const existingEntries = await AsyncStorage.getItem('audioEntries');
@@ -74,25 +73,23 @@ export default function AudioRecorderScreen() {
     }
   };
 
-  async function uploadAudio(uri:any) {
+  async function uploadAudio(uri: string) {
     try {
       const formData = new FormData();
       
-      // Crear el objeto del archivo
       const audioFile = {
         uri: uri,
-        type: 'audio/m4a', // Ajusta según el formato de grabación
+        type: 'audio/m4a',
         name: 'audio_recording.m4a'
-      };
+      } as const;
       
-      formData.append('file', audioFile);
+      formData.append('file', audioFile as any);
 
       const response = await fetch('http://192.168.1.61:8000/api/v1/audio', {
         method: 'POST',
         body: formData,
         headers: {
           'Content-Type': 'multipart/form-data',
-          // Agrega aquí otros headers necesarios (ej: autorización)
         },
       });
 
@@ -101,8 +98,8 @@ export default function AudioRecorderScreen() {
       }
 
       const result = await response.json();
-      await saveAudioEntry(uri, result.transcription);
-      console.log('Audio uploaded successfully:', result);
+      console.log('Audio uploaded successfully:', result);  
+      await saveAudioEntry(uri, result.analysis.transcript, result.analysis.classification, result.analysis.irrational_ideas);
     } catch (error) {
       console.error('Error uploading audio:', error);
     }
@@ -147,7 +144,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#FFB347', // Color naranja similar al de la imagen
+    color: '#FFB347', 
     marginTop: 40,
   },
   subtitle: {
