@@ -89,25 +89,11 @@ Atheleia is an emotional regulator that synchronizes heart rate with music to pr
 
 
 ## Usage Example
-
-<video width="320" height="240" controls>
-  <source src="/docs/Video_app.mp4" type="video/mp4">
-  Tu navegador no soporta el elemento video.
-</video>
+[Ver video de uso](/docs/Video_app.mp4)
 
 ## Figma videos
+### User interface
+[Ver video de interfaz de usuario](/docs/aletheia_user_figma.mp4)
 
-### User interfaze
-
-<video width="320" height="240" controls>
-  <source src="/docs/aletheia_user_figma.mp4" type="video/mp4">
-  Tu navegador no soporta el elemento video.
-</video>
-
-### Doc interfaze
-
-<video width="320" height="240" controls>
-  <source src="/docs/aletheia_doc_figma.mp4" type="video/mp4">
-  Tu navegador no soporta el elemento video.
-</video>
-
+### Doc interface
+[Ver video de interfaz de documentación](/docs/aletheia_doc_figma.mp4)
