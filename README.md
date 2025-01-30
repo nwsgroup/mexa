@@ -1,5 +1,7 @@
 # Aletheia
 
+<img src="./AletheiaAppNew/assets/images/icon.png"  width="200" height="200" center alt="icon">
+
 ## Overview
 
 Atheleia is an emotional regulator that synchronizes heart rate with music to progressively reduce anxiety, anger, or fear by gradually slowing down the music's BPM (beats per minute). In cases of sadness, it increases the heart rate to bring the user back to a baseline emotional state. The app also includes a diary feature where users can record their thoughts and feelings, which can be shared with their therapist. The therapist receives audio recordings, transcriptions, and detected irrational thoughts, allowing for better context understanding and treatment adjustments.  
